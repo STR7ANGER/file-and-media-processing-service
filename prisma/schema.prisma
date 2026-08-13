@@ -1,0 +1,72 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+enum AssetStatus {
+  PENDING_UPLOAD
+  UPLOADING
+  QUARANTINED
+  SCANNING
+  READY
+  REJECTED
+  DELETED
+}
+enum Visibility {
+  PRIVATE
+  TENANT
+  PUBLIC
+}
+model Tenant {
+  id String @id @default(cuid())
+  name String
+  storageQuotaBytes BigInt @default(5000000000)
+  assets Asset[]
+  apiKeys ApiKey[]
+  audits AuditEvent[]
+}
+model ApiKey {
+  id String @id @default(cuid())
+  tenantId String
+  name String
+  keyHash String @unique
+  tenant Tenant @relation(fields:[tenantId],references:[id],onDelete:Cascade)
+  @@index([tenantId])
+}
+model Asset {
+  id String @id @default(cuid())
+  tenantId String
+  fileName String
+  mediaType String
+  bytes BigInt
+  checksum String
+  status AssetStatus @default(PENDING_UPLOAD)
+  visibility Visibility @default(PRIVATE)
+  createdAt DateTime @default(now())
+  tenant Tenant @relation(fields:[tenantId],references:[id],onDelete:Cascade)
+  versions AssetVersion[]
+  @@index([tenantId,status,createdAt])
+}
+model AssetVersion {
+  id String @id @default(cuid())
+  assetId String
+  version Int
+  objectKey String
+  scanVerdict String?
+  metadata Json?
+  asset Asset @relation(fields:[assetId],references:[id],onDelete:Cascade)
+  @@unique([assetId,version])
+}
+model AuditEvent {
+  id String @id @default(cuid())
+  tenantId String
+  actorId String
+  action String
+  assetId String
+  correlationId String
+  createdAt DateTime @default(now())
+  tenant Tenant @relation(fields:[tenantId],references:[id],onDelete:Cascade)
+  @@index([tenantId,createdAt])
+}
